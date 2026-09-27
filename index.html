@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TaxiFlow — соберите систему управления таксопарком без программиста</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F4F5F2;
+  --card:#FFFFFF;
+  --ink:#17222E;
+  --ink-2:#55606B;
+  --ink-3:#8A939C;
+  --taxi:#FFC20E;
+  --taxi-deep:#E0A500;
+  --line:#DCE0DA;
+  --line-2:#C2C8BF;
+  --rail:#14202B;
+  --rail-2:#1D2C3A;
+  --on:#157A48;
+  --wait:#5E6A77;
+  --serv:#C07708;
+  --rep:#B4321F;
+  --off:#98A0A7;
+  --r:10px;
+  --pad:24px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+h1{font-size:clamp(30px,4.4vw,52px)}
+h2{font-size:clamp(21px,2.4vw,27px)}
+h3{font-size:17px;letter-spacing:-.01em}
+p{margin:0}
+a{color:inherit}
+button{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* шашечка такси — единственный декоративный мотив */
+.checker{height:8px;background:
+  repeating-linear-gradient(90deg,var(--ink) 0 14px,transparent 14px 28px) 0 0/28px 4px repeat-x,
+  repeating-linear-gradient(90deg,transparent 0 14px,var(--ink) 14px 28px) 0 4px/28px 4px repeat-x,
+  var(--taxi);
+}
+
+/* ---------- ЛЕНДИНГ ---------- */
+.land{max-width:1120px;margin:0 auto;padding:0 20px 80px}
+.land-nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.logo-mark{width:26px;height:26px;border-radius:6px;background:var(--taxi);position:relative;flex:none}
+.logo-mark::after{content:"";position:absolute;inset:6px 5px auto 5px;height:5px;background:var(--ink);
+  box-shadow:0 7px 0 var(--ink)}
+.hero{padding:56px 0 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px);gap:48px;align-items:center}
+.hero p.sub{margin-top:20px;font-size:18px;color:var(--ink-2);max-width:60ch}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.btn{border:1px solid var(--ink);background:none;border-radius:var(--r);padding:12px 20px;font-weight:600;cursor:pointer;
+  transition:transform .12s ease,background-color .12s ease}
+.btn:hover{background:rgba(23,34,46,.06)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{
+  outline:3px solid var(--taxi);outline-offset:2px}
+.btn-main{background:var(--taxi);border-color:var(--taxi)}
+.btn-main:hover{background:var(--taxi-deep);border-color:var(--taxi-deep)}
+.btn-sm{padding:8px 14px;font-size:14px}
+.btn-ghost{border-color:var(--line-2)}
+
+/* доска фишек в герое */
+.board{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.board-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.board-head span{font-size:13px;color:var(--ink-3)}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.chip{border:1px solid var(--line);border-left:4px solid var(--st,var(--off));border-radius:8px;padding:8px 10px;background:var(--paper)}
+.chip b{display:block;font-size:13px;font-weight:600}
+.chip span{font-size:11.5px;color:var(--ink-3)}
+.st-on{--st:var(--on)} .st-wait{--st:var(--wait)} .st-serv{--st:var(--serv)} .st-rep{--st:var(--rep)} .st-off{--st:var(--off)}
+
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:44px 0;border-top:1px solid var(--line)}
+.feat h3{margin-bottom:6px}
+.feat p{color:var(--ink-2);font-size:14.5px}
+
+/* тарифы */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+.plan{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column}
+.plan.pick{border-color:var(--ink);box-shadow:0 0 0 3px var(--taxi)}
+.price{font-size:32px;font-weight:800;margin:10px 0 4px;letter-spacing:-.03em}
+.price small{font-size:14px;font-weight:500;color:var(--ink-3)}
+.plan ul{margin:14px 0 20px;padding-left:18px;color:var(--ink-2);font-size:14.5px}
+.plan li{margin-bottom:5px}
+.plan .btn{margin-top:auto}
+
+/* ---------- ПРИЛОЖЕНИЕ ---------- */
+.app{display:none;min-height:100vh;grid-template-columns:232px minmax(0,1fr)}
+.app.live{display:grid}
+.rail{background:var(--rail);color:#E9ECEA;padding:18px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow:auto}
+.rail .logo{color:#fff;padding:4px 8px 16px}
+.rail a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;text-decoration:none;
+  color:#C4CCD3;font-size:14.5px;cursor:pointer}
+.rail a:hover{background:var(--rail-2);color:#fff}
+.rail a.on{background:var(--taxi);color:var(--ink);font-weight:600}
+.rail .sep{margin:12px 10px 6px;font-size:11px;color:#6C7A87;text-transform:none}
+.rail .ic{width:18px;text-align:center;flex:none;opacity:.9}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);padding:14px var(--pad);
+  display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:20}
+.topbar h2{font-size:20px}
+.topbar .who{font-size:13.5px;color:var(--ink-3)}
+.content{padding:var(--pad);display:grid;gap:18px;align-content:start}
+.burger{display:none}
+
+/* карточки-метрики */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi b{display:block;font-size:clamp(20px,2.1vw,26px);font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.kpi span{font-size:13px;color:var(--ink-3)}
+.kpi.warn b{color:var(--rep)}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.panel-body{padding:16px}
+.cols{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start}
+
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{ text-align:left;font-weight:600;color:var(--ink-3);font-size:13px;padding:10px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 16px;border-bottom:1px solid var(--line)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#FAFBF9}
+tbody tr:last-child td{border-bottom:none}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--st,var(--off));margin-right:7px;vertical-align:1px}
+.tag{display:inline-block;padding:2px 8px;border:1px solid var(--line-2);border-radius:20px;font-size:12.5px;white-space:nowrap}
+.tag.bad{border-color:var(--rep);color:var(--rep)}
+.tag.warn{border-color:var(--serv);color:var(--serv)}
+.tag.ok{border-color:var(--on);color:var(--on)}
+
+.feed{display:grid;gap:0}
+.feed div{padding:11px 16px;border-bottom:1px solid var(--line);font-size:14px}
+.feed div:last-child{border-bottom:none}
+.feed time{color:var(--ink-3);font-size:12.5px;display:block}
+
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label{font-size:13.5px;color:var(--ink-2)}
+input,select{font:inherit;padding:10px 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--card);width:100%}
+
+/* ---------- КОНСТРУКТОР АВТОМАТИЗАЦИЙ — главный экран ---------- */
+.flow{background:
+    linear-gradient(90deg,rgba(23,34,46,.05) 1px,transparent 1px) 0 0/22px 22px,
+    linear-gradient(rgba(23,34,46,.05) 1px,transparent 1px) 0 0/22px 22px,var(--card);
+  border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:0;justify-items:center}
+.node{width:min(520px,100%);background:var(--card);border:2px solid var(--ink);border-radius:12px;padding:14px 16px;
+  cursor:grab;position:relative}
+.node[draggable=true]:active{cursor:grabbing}
+.node.drag{opacity:.4}
+.node.over{border-color:var(--taxi-deep);box-shadow:0 0 0 4px rgba(255,194,14,.35)}
+.node-kind{font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--ink-3)}
+.node-when{border-color:var(--on)} .node-if{border-color:var(--serv)} .node-then{border-color:var(--ink)}
+.node select{margin-top:8px}
+.node-del{position:absolute;top:8px;right:8px;border:none;background:none;color:var(--ink-3);cursor:pointer;font-size:16px;line-height:1;padding:4px}
+.node-del:hover{color:var(--rep)}
+.link{width:3px;height:26px;background:var(--taxi);position:relative}
+.link::after{content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--taxi)}
+.tpl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tpl button{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer}
+.tpl button:hover{border-color:var(--ink)}
+.tpl b{display:block;font-size:14.5px}
+.tpl span{font-size:12.5px;color:var(--ink-3)}
+
+/* ---------- NO-CODE КОНСТРУКТОР ЭКРАНОВ ---------- */
+.build{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px}
+.palette{display:grid;gap:8px;align-content:start}
+.pal{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:grab;font-size:14px}
+.pal:hover{border-color:var(--ink)}
+.canvas{min-height:340px;border:2px dashed var(--line-2);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start;background:var(--card)}
+.canvas.hot{border-color:var(--taxi-deep);background:#FFFDF4}
+.canvas .empty{color:var(--ink-3);text-align:center;padding:60px 10px;font-size:14.5px}
+.blk{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--paper);position:relative}
+.blk b{font-size:14.5px}
+.blk .cfg{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.blk select{width:auto;padding:6px 10px;font-size:13.5px}
+
+.modal{position:fixed;inset:0;background:rgba(20,32,43,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:60}
+.modal.live{display:flex}
+.sheet{background:var(--card);border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow:auto}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+.sheet-body{padding:20px}
+.x{border:none;background:none;font-size:22px;cursor:pointer;line-height:1;color:var(--ink-3)}
+.x:hover{color:var(--ink)}
+
+.steps{display:flex;gap:8px;margin-bottom:22px}
+.steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.steps i.on{background:var(--taxi)}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+.mods label{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer}
+.mods input{width:auto}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);background:var(--ink);color:#fff;
+  padding:12px 18px;border-radius:10px;font-size:14.5px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90}
+.toast.live{opacity:1;transform:translateX(-50%)}
+.note{font-size:13px;color:var(--ink-3);background:var(--paper);border:1px dashed var(--line-2);border-radius:8px;padding:10px 12px}
+.bars{display:grid;gap:9px}
+.bar-row{display:grid;grid-template-columns:120px 1fr 78px;gap:10px;align-items:center;font-size:14px}
+.bar{height:10px;border-radius:5px;background:var(--line)}
+.bar i{display:block;height:100%;border-radius:5px;background:var(--ink)}
+
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr;gap:28px}
+  .feat,.plans{grid-template-columns:1fr}
+  .cols{grid-template-columns:1fr}
+  .build{grid-template-columns:1fr}
+  .palette{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));display:grid}
+  .app.live{grid-template-columns:1fr}
+  .rail{position:fixed;left:0;top:0;bottom:0;width:232px;transform:translateX(-100%);transition:transform .2s;z-index:50;height:100vh}
+  .rail.open{transform:none}
+  .burger{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;padding:7px 11px;background:none;cursor:pointer}
+  table{font-size:13.5px;min-width:620px}
+  th,td{padding:9px 12px}
+  .panel{overflow-x:auto}
+  .panel-head{position:sticky;left:0}
+  .who{display:none}
+  .topbar h2{font-size:18px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= ЛЕНДИНГ ================= -->
+<div id="landing">
+  <div class="checker"></div>
+  <div class="land">
+    <nav class="land-nav">
+      <div class="logo"><span class="logo-mark"></span>TaxiFlow</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-sm btn-ghost" onclick="openApp()">Демо-парк</button>
+        <button class="btn btn-sm btn-main" onclick="startOnboarding()">Попробовать за 1 ₽</button>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <h1>Соберите свою систему управления таксопарком без программиста</h1>
+        <p class="sub">Автомобили, водители, ТО, документы и автоматизации — в одной no-code платформе. Вы сами задаёте правила, по которым работает парк, и меняете их когда угодно.</p>
+        <div class="hero-cta">
+          <button class="btn btn-main" onclick="startOnboarding()">Попробовать за 1 ₽</button>
+          <button class="btn btn-ghost" onclick="openApp('automations')">Показать конструктор правил</button>
+        </div>
+        <p style="margin-top:18px;font-size:13.5px;color:var(--ink-3)">Учебный прототип. Данные демонстрационные, оплата не подключена.</p>
+      </div>
+
+      <div class="board" aria-label="Состояние парка прямо сейчас">
+        <div class="board-head"><h3>Парк сейчас</h3><span>обновлено 2 минуты назад</span></div>
+        <div class="chips" id="heroChips"></div>
+      </div>
+    </section>
+
+    <section class="feat">
+      <div>
+        <h3>Правила вместо напоминаний</h3>
+        <p>Условие, которое раньше жило в голове владельца, становится правилом системы: пробег дошёл до порога — задача на ТО создана сама.</p>
+      </div>
+      <div>
+        <h3>Парк целиком в одном месте</h3>
+        <p>Машины, водители, документы, аренда и расходы перестают жить в таблицах и переписках.</p>
+      </div>
+      <div>
+        <h3>Экраны собираются мышью</h3>
+        <p>Нужен свой отчёт — соберите его из блоков: таблица, фильтр, график. Без разработчика и без ожидания.</p>
+      </div>
+    </section>
+
+    <section style="padding-top:40px;border-top:1px solid var(--line)">
+      <h2>Тарифы</h2>
+      <p style="color:var(--ink-2);margin-top:8px">Первые 7 дней — за 1 ₽. Дальше можно не продлевать.</p>
+      <div class="plans">
+        <div class="plan">
+          <h3>START</h3>
+          <div class="price">1 ₽ <small>/ 7 дней</small></div>
+          <ul><li>до 5 автомобилей</li><li>базовые разделы</li><li>3 автоматизации</li></ul>
+          <button class="btn" onclick="startOnboarding()">Начать за 1 ₽</button>
+        </div>
+        <div class="plan pick">
+          <h3>BUSINESS</h3>
+          <div class="price">499 ₽ <small>/ месяц</small></div>
+          <ul><li>до 50 автомобилей</li><li>автоматизации без ограничений</li><li>аналитика</li><li>уведомления водителям</li></ul>
+          <button class="btn btn-main" onclick="startOnboarding()">Выбрать BUSINESS</button>
+        </div>
+        <div class="plan">
+          <h3>PRO</h3>
+          <div class="price">999 ₽ <small>/ месяц</small></div>
+          <ul><li>до 100 автомобилей</li><li>расширенная аналитика</li><li>интеграции</li><li>доступ к API</li></ul>
+          <button class="btn" onclick="startOnboarding()">Выбрать PRO</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ================= ПРИЛОЖЕНИЕ ================= -->
+<div class="app" id="app">
+  <aside class="rail" id="rail">
+    <div class="logo"><span class="logo-mark"></span>TaxiFlow</div>
+    <a data-go="dash"><span class="ic">▤</span>Обзор</a>
+    <a data-go="cars"><span class="ic">▮</span>Автомобили</a>
+    <a data-go="drivers"><span class="ic">☺</span>Водители</a>
+    <a data-go="mileage"><span class="ic">⏱</span>Пробег</a>
+    <a data-go="docs"><span class="ic">▤</span>Документы</a>
+    <a data-go="service"><span class="ic">✦</span>ТО и обслуживание</a>
+    <a data-go="finance"><span class="ic">₽</span>Финансы</a>
+    <div class="sep">Без программиста</div>
+    <a data-go="automations"><span class="ic">⚡</span>Автоматизации</a>
+    <a data-go="builder"><span class="ic">◧</span>Конструктор</a>
+    <div class="sep" id="myScreensSep" style="display:none">Мои экраны</div>
+    <div id="myScreens"></div>
+    <div class="sep">Прочее</div>
+    <a data-go="analytics"><span class="ic">◔</span>Аналитика</a>
+    <a data-go="settings"><span class="ic">⚙</span>Настройки</a>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="burger" onclick="document.getElementById('rail').classList.toggle('open')" aria-label="Меню">≡</button>
+        <h2 id="title">Обзор</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="who" id="who">Таксопарк «Демо» · BUSINESS</span>
+        <button class="btn btn-sm btn-ghost" onclick="backToSite()">На сайт</button>
+      </div>
+    </header>
+    <div class="content" id="view"></div>
+  </div>
+</div>
+
+<!-- модалки -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-head"><h3 id="mTitle">—</h3><button class="x" onclick="closeModal()" aria-label="Закрыть">×</button></div>
+    <div class="sheet-body" id="mBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= ДЕМО-ДАННЫЕ ================= */
+const STATUS = {
+  line:{t:'На линии',c:'st-on'}, free:{t:'Свободен',c:'st-wait'},
+  serv:{t:'На ТО',c:'st-serv'}, rep:{t:'Ремонт',c:'st-rep'}, off:{t:'Недоступен',c:'st-off'}
+};
+const cars = [
+  {id:1,  m:'Lada Vesta',      p:'А142ВС 777', y:2022, km:128540, st:'line', drv:2,  next:6400,  cost:18400, ins:'2027-01-14', to:'2026-11-02'},
+  {id:2,  m:'Hyundai Solaris', p:'В317ЕК 799', y:2021, km:214300, st:'line', drv:5,  next:1700,  cost:24150, ins:'2026-10-03', to:'2026-10-18'},
+  {id:3,  m:'Kia Rio',         p:'Е884МН 777', y:2023, km:76120,  st:'free', drv:null,next:9800, cost:11300, ins:'2027-04-22', to:'2027-01-09'},
+  {id:4,  m:'Volkswagen Polo', p:'К219РТ 750', y:2020, km:268900, st:'serv', drv:8,  next:0,     cost:31200, ins:'2026-12-11', to:'2026-09-29'},
+  {id:5,  m:'Skoda Rapid',     p:'М605ХА 777', y:2022, km:154770, st:'line', drv:1,  next:4200,  cost:19800, ins:'2027-02-28', to:'2026-12-05'},
+  {id:6,  m:'Renault Logan',   p:'Н473СТ 790', y:2019, km:312450, st:'rep',  drv:null,next:0,    cost:42600, ins:'2026-10-27', to:'2026-10-01'},
+  {id:7,  m:'Toyota Camry',    p:'О112УК 777', y:2023, km:64300,  st:'line', drv:11, next:10600, cost:15700, ins:'2027-06-09', to:'2027-03-14'},
+  {id:8,  m:'Hyundai Elantra', p:'Р558ВМ 799', y:2021, km:198220, st:'free', drv:null,next:2900, cost:22400, ins:'2026-11-19', to:'2026-11-23'},
+  {id:9,  m:'Nissan Almera',   p:'С390НЕ 750', y:2018, km:341800, st:'off',  drv:null,next:0,    cost:38900, ins:'2026-09-30', to:'2026-09-25'},
+  {id:10, m:'Chevrolet Cobalt',p:'Т726КХ 777', y:2020, km:229640, st:'line', drv:14, next:5100,  cost:20050, ins:'2027-03-07', to:'2026-12-20'}
+];
+const drivers = [
+  {id:1, n:'Армен Гаспарян',   ph:'+7 903 145-22-01', car:5,  since:'2024-03-11', st:'line', debt:0,     sh:412, rate:4.9, docs:'ok'},
+  {id:2, n:'Давид Мкртчян',    ph:'+7 916 883-40-17', car:1,  since:'2023-11-02', st:'line', debt:3200,  sh:588, rate:4.8, docs:'ok'},
+  {id:3, n:'Сергей Ковалёв',   ph:'+7 925 512-77-34', car:null,since:'2025-01-20',st:'free', debt:0,     sh:198, rate:4.7, docs:'soon'},
+  {id:4, n:'Тигран Петросян',  ph:'+7 964 220-15-88', car:null,since:'2024-07-05',st:'free', debt:1500,  sh:307, rate:4.6, docs:'ok'},
+  {id:5, n:'Игорь Савельев',   ph:'+7 909 771-03-42', car:2,  since:'2022-09-14', st:'line', debt:0,     sh:741, rate:4.9, docs:'ok'},
+  {id:6, n:'Ваган Саркисян',   ph:'+7 926 344-98-10', car:null,since:'2025-05-30',st:'free', debt:0,     sh:96,  rate:4.5, docs:'miss'},
+  {id:7, n:'Михаил Егоров',    ph:'+7 985 610-27-55', car:null,since:'2024-02-08', st:'off', debt:8400,  sh:355, rate:4.2, docs:'miss'},
+  {id:8, n:'Арам Овсепян',     ph:'+7 903 902-16-73', car:4,  since:'2023-06-19', st:'serv',debt:0,     sh:499, rate:4.8, docs:'ok'},
+  {id:9, n:'Никита Фомин',     ph:'+7 917 455-81-26', car:null,since:'2025-08-01', st:'free',debt:0,     sh:41,  rate:4.4, docs:'soon'},
+  {id:10,n:'Гор Айвазян',      ph:'+7 962 130-64-09', car:null,since:'2024-10-12', st:'free',debt:2100,  sh:268, rate:4.7, docs:'ok'},
+  {id:11,n:'Павел Зуев',       ph:'+7 906 288-37-91', car:7,  since:'2023-04-23', st:'line',debt:0,     sh:612, rate:5.0, docs:'ok'},
+  {id:12,n:'Рубен Азарян',     ph:'+7 977 519-72-40', car:null,since:'2025-02-17', st:'free',debt:0,     sh:172, rate:4.6, docs:'ok'},
+  {id:13,n:'Андрей Лапшин',    ph:'+7 915 640-11-58', car:null,since:'2024-12-03', st:'off', debt:5600,  sh:224, rate:4.3, docs:'soon'},
+  {id:14,n:'Карен Бадалян',    ph:'+7 968 471-25-63', car:10, since:'2022-12-28', st:'line',debt:0,     sh:695, rate:4.9, docs:'ok'},
+  {id:15,n:'Олег Ситников',    ph:'+7 999 302-88-14', car:null,since:'2025-07-09', st:'free',debt:900,   sh:118, rate:4.5, docs:'ok'}
+];
+let mileageLog = [
+  {car:2, km:214300, d:'2026-09-27 08:14', drv:5,  src:'Фото одометра'},
+  {car:1, km:128540, d:'2026-09-27 07:52', drv:2,  src:'Ручной ввод'},
+  {car:7, km:64300,  d:'2026-09-26 21:05', drv:11, src:'Ручной ввод'},
+  {car:5, km:154770, d:'2026-09-26 20:41', drv:1,  src:'Фото одометра'},
+  {car:10,km:229640, d:'2026-09-26 19:58', drv:14, src:'Ручной ввод'}
+];
+const service = [
+  {car:4, what:'Замена масла и фильтров', d:'2026-09-29', sum:8400,  st:'В работе'},
+  {car:6, what:'Ремонт подвески',         d:'2026-10-01', sum:23500, st:'В работе'},
+  {car:9, what:'Диагностика двигателя',   d:'2026-09-25', sum:4200,  st:'Просрочено'},
+  {car:2, what:'ТО по пробегу 215 000',   d:'2026-10-18', sum:9800,  st:'Запланировано'},
+  {car:1, what:'ТО по пробегу 130 000',   d:'2026-11-02', sum:9800,  st:'Запланировано'}
+];
+const events = [
+  {t:'Автомобиль К219РТ переведён в статус «На ТО»', at:'сегодня, 09:12'},
+  {t:'Правило «ТО по пробегу» создало задачу для В317ЕК', at:'сегодня, 08:14'},
+  {t:'Водитель Ваган Саркисян не загрузил водительское удостоверение', at:'вчера, 18:40'},
+  {t:'Страховка Н473СТ заканчивается через 30 дней', at:'вчера, 10:05'},
+  {t:'Михаил Егоров: задолженность по аренде 8 400 ₽', at:'25 сентября'}
+];
+const money = [
+  {n:'Аренда с водителей', v:486000, k:'+'},
+  {n:'Топливо',            v:214300, k:'−'},
+  {n:'Ремонт и ТО',        v:96400,  k:'−'},
+  {n:'Страховки',          v:38200,  k:'−'},
+  {n:'Штрафы',             v:12500,  k:'−'}
+];
+
+/* ================= УТИЛИТЫ ================= */
+const $ = s => document.querySelector(s);
+const car = id => cars.find(c=>c.id===id);
+const drv = id => drivers.find(d=>d.id===id);
+const nf = n => n.toLocaleString('ru-RU');
+const fmt = iso => { if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}.${m}.${y}` };
+const fmtDT = s => { const [d,t]=s.split(' '); return d.includes('-') ? fmt(d)+' '+t : s };
+const days = iso => Math.round((new Date(iso) - new Date('2026-09-27'))/864e5);
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('live');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('live'),2600)}
+function openModal(title,html){$('#mTitle').textContent=title;$('#mBody').innerHTML=html;$('#modal').classList.add('live')}
+function closeModal(){$('#modal').classList.remove('live')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+/* ================= ЛЕНДИНГ: ДОСКА ФИШЕК ================= */
+$('#heroChips').innerHTML = cars.map(c=>
+  `<div class="chip ${STATUS[c.st].c}"><b>${c.p.split(' ')[0]}</b><span>${STATUS[c.st].t}</span></div>`).join('');
+
+/* ================= ONBOARDING ================= */
+let onbo = {cars:10, drivers:15, mods:['cars','drivers','service','docs','finance','auto']};
+function startOnboarding(){ step(1) }
+function step(n){
+  const bar = i => `<div class="steps">${[1,2,3,4].map(k=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`;
+  if(n===1) openModal('Создайте свой таксопарк', bar(1)+`
+    <p style="color:var(--ink-2);margin-bottom:16px">Шаг 1 из 4. Сколько автомобилей в парке?</p>
+    <div class="field"><label for="ob1">Количество автомобилей</label><input id="ob1" type="number" min="1" max="100" value="${onbo.cars}"></div>
+    <button class="btn btn-main" onclick="onbo.cars=+document.getElementById('ob1').value||10;step(2)">Дальше</button>`);
+  if(n===2) openModal('Создайте свой таксопарк', bar(2)+`
+    <p style="color:var(--ink-2);margin-bottom:16px">Шаг 2 из 4. Сколько водителей добавить?</p>
+    <div class="field"><label for="ob2">Количество водителей</label><input id="ob2" type="number" min="1" max="300" value="${onbo.drivers}"></div>
+    <button class="btn btn-main" onclick="onbo.drivers=+document.getElementById('ob2').value||15;step(3)">Дальше</button>`);
+  if(n===3) openModal('Создайте свой таксопарк', bar(3)+`
+    <p style="color:var(--ink-2);margin-bottom:16px">Шаг 3 из 4. Какие разделы включить? Их можно поменять позже.</p>
+    <div class="mods">
+      ${[['cars','Автомобили'],['drivers','Водители'],['service','ТО'],['docs','Документы'],['finance','Финансы'],['auto','Автоматизации']]
+        .map(([k,t])=>`<label><input type="checkbox" value="${k}" checked>${t}</label>`).join('')}
+    </div>
+    <button class="btn btn-main" style="margin-top:18px" onclick="step(4)">Дальше</button>`);
+  if(n===4) openModal('Создайте свой таксопарк', bar(4)+`
+    <p style="color:var(--ink-2)">Шаг 4 из 4. Всё готово к сборке.</p>
+    <div class="panel" style="margin:16px 0">
+      <div class="panel-body">
+        <p><b>${onbo.cars}</b> автомобилей · <b>${onbo.drivers}</b> водителей</p>
+        <p style="color:var(--ink-2);margin-top:6px">Система соберёт обзор и выбранные разделы. В прототипе рабочее пространство наполнено демо-данными.</p>
+      </div>
+    </div>
+    <button class="btn btn-main" onclick="closeModal();openApp();toast('Рабочее пространство создано')">Создать рабочее пространство</button>`);
+}
+
+/* ================= НАВИГАЦИЯ ================= */
+const TITLES = {dash:'Обзор',cars:'Автомобили',drivers:'Водители',mileage:'Пробег',docs:'Документы',
+  service:'ТО и обслуживание',finance:'Финансы',automations:'Автоматизации',builder:'Конструктор',
+  analytics:'Аналитика',settings:'Настройки'};
+function openApp(go){ $('#landing').style.display='none'; $('#app').classList.add('live'); nav(go||'dash') }
+function backToSite(){ $('#app').classList.remove('live'); $('#landing').style.display='' ; window.scrollTo(0,0)}
+function nav(key){
+  document.querySelectorAll('.rail a').forEach(a=>a.classList.toggle('on',a.dataset.go===key));
+  $('#title').textContent = TITLES[key] || (myScreens.find(s=>s.key===key)?.name ?? '—');
+  $('#rail').classList.remove('open');
+  const v = $('#view'); v.innerHTML = (VIEWS[key] || viewCustom)(key); window.scrollTo(0,0);
+  if(key==='automations') wireFlow();
+  if(key==='builder') wireBuilder();
+}
+document.querySelectorAll('.rail a').forEach(a=>a.addEventListener('click',()=>nav(a.dataset.go)));
+
+/* ================= ЭКРАНЫ ================= */
+const statusCell = st => `<span class="dot ${STATUS[st].c}"></span>${STATUS[st].t}`;
+
+function viewDash(){
+  const onLine = cars.filter(c=>c.st==='line').length;
+  const inRep  = cars.filter(c=>c.st==='rep'||c.st==='serv').length;
+  const soonTo = cars.filter(c=>c.next>0 && c.next<3000).length;
+  const expDocs= cars.filter(c=>days(c.ins)<45).length + drivers.filter(d=>d.docs!=='ok').length;
+  const spend  = money.filter(m=>m.k==='−').reduce((s,m)=>s+m.v,0);
+  return `
+  <div class="kpis">
+    <div class="kpi"><b class="num">${cars.length}</b><span>автомобилей</span></div>
+    <div class="kpi"><b class="num">${drivers.length}</b><span>водителей</span></div>
+    <div class="kpi"><b class="num">${onLine}</b><span>на линии</span></div>
+    <div class="kpi"><b class="num">${inRep}</b><span>на ТО и в ремонте</span></div>
+    <div class="kpi warn"><b class="num">${soonTo}</b><span>ТО в ближайшее время</span></div>
+    <div class="kpi warn"><b class="num">${expDocs}</b><span>документов истекает</span></div>
+    <div class="kpi"><b class="num">${nf(spend)} ₽</b><span>расходы за месяц</span></div>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <div class="panel-head"><h3>Доска парка</h3><span style="font-size:13px;color:var(--ink-3)">цвет слева — статус машины</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${cars.map(c=>`<div class="chip ${STATUS[c.st].c}" onclick="carCard(${c.id})" style="cursor:pointer">
+            <b>${c.p.split(' ')[0]}</b><span>${STATUS[c.st].t}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Последние события</h3></div>
+      <div class="feed">${events.map(e=>`<div>${e.t}<time>${e.at}</time></div>`).join('')}</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Ближайшие ТО и истекающие документы</h3>
+      <button class="btn btn-sm btn-ghost" onclick="nav('service')">Все работы</button></div>
+    <table>
+      <thead><tr><th>Автомобиль</th><th>Что заканчивается</th><th>Дата</th><th>Осталось</th></tr></thead>
+      <tbody>
+        ${cars.filter(c=>days(c.to)<60).sort((a,b)=>days(a.to)-days(b.to)).map(c=>`
+          <tr onclick="carCard(${c.id})"><td>${c.m} · ${c.p}</td><td>Плановое ТО</td><td class="num">${fmt(c.to)}</td>
+          <td>${days(c.to)<0?`<span class="tag bad">просрочено на ${-days(c.to)} дн.</span>`:`<span class="tag ${days(c.to)<14?'warn':''}">${days(c.to)} дн.</span>`}</td></tr>`).join('')}
+        ${cars.filter(c=>days(c.ins)<45).map(c=>`
+          <tr onclick="carCard(${c.id})"><td>${c.m} · ${c.p}</td><td>Страховка ОСАГО</td><td class="num">${fmt(c.ins)}</td>
+          <td><span class="tag ${days(c.ins)<14?'bad':'warn'}">${days(c.ins)} дн.</span></td></tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function viewCars(){
+  return `
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Автомобили · ${cars.length}</h3>
+      <button class="btn btn-sm btn-main" onclick="toast('В прототипе добавление машин отключено')">Добавить автомобиль</button>
+    </div>
+    <table>
+      <thead><tr><th>Марка и модель</th><th>Номер</th><th>Год</th><th>Пробег</th><th>Статус</th><th>Водитель</th><th>Следующее ТО</th><th>Расходы</th></tr></thead>
+      <tbody>${cars.map(c=>`<tr onclick="carCard(${c.id})">
+        <td><b>${c.m}</b></td><td class="num">${c.p}</td><td class="num">${c.y}</td>
+        <td class="num">${nf(c.km)} км</td><td>${statusCell(c.st)}</td>
+        <td>${c.drv?drv(c.drv).n:'<span style="color:var(--ink-3)">не закреплён</span>'}</td>
+        <td class="num">${fmt(c.to)}</td><td class="num">${nf(c.cost)} ₽</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function carCard(id){
+  const c = car(id);
+  const hist = mileageLog.filter(m=>m.car===id);
+  const srv = service.filter(s=>s.car===id);
+  openModal(`${c.m} · ${c.p}`, `
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi"><b class="num">${nf(c.km)}</b><span>пробег, км</span></div>
+      <div class="kpi"><b>${STATUS[c.st].t}</b><span>статус</span></div>
+      <div class="kpi"><b class="num">${c.next?nf(c.next):'—'}</b><span>км до ТО</span></div>
+      <div class="kpi"><b class="num">${nf(c.cost)} ₽</b><span>расходы за месяц</span></div>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Документы</h3></div>
+      <table><tbody>
+        <tr><td>Страховка ОСАГО</td><td class="num">${fmt(c.ins)}</td><td>${days(c.ins)<45?`<span class="tag ${days(c.ins)<14?'bad':'warn'}">через ${days(c.ins)} дн.</span>`:'<span class="tag ok">действует</span>'}</td></tr>
+        <tr><td>Плановое ТО</td><td class="num">${fmt(c.to)}</td><td>${days(c.to)<0?'<span class="tag bad">просрочено</span>':`<span class="tag">через ${days(c.to)} дн.</span>`}</td></tr>
+      </tbody></table>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>История пробега</h3></div>
+      ${hist.length?`<table><thead><tr><th>Дата</th><th>Пробег</th><th>Источник</th><th>Водитель</th></tr></thead>
+        <tbody>${hist.map(h=>`<tr><td class="num">${fmtDT(h.d)}</td><td class="num">${nf(h.km)} км</td><td>${h.src}</td><td>${drv(h.drv)?.n||'—'}</td></tr>`).join('')}</tbody></table>`
+        :'<div class="panel-body" style="color:var(--ink-3)">Записей пока нет. Пробег вносится в разделе «Пробег».</div>'}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Работы по обслуживанию</h3></div>
+      ${srv.length?`<table><thead><tr><th>Работа</th><th>Дата</th><th>Сумма</th><th>Статус</th></tr></thead>
+        <tbody>${srv.map(s=>`<tr><td>${s.what}</td><td class="num">${fmt(s.d)}</td><td class="num">${nf(s.sum)} ₽</td><td>${s.st}</td></tr>`).join('')}</tbody></table>`
+        :'<div class="panel-body" style="color:var(--ink-3)">Работ не запланировано.</div>'}
+    </div>`);
+}
+
+function viewDrivers(){
+  const dd = {ok:'<span class="tag ok">в порядке</span>',soon:'<span class="tag warn">истекают</span>',miss:'<span class="tag bad">не загружены</span>'};
+  return `
+  <div class="panel">
+    <div class="panel-head"><h3>Водители · ${drivers.length}</h3>
+      <button class="btn btn-sm btn-main" onclick="toast('В прототипе добавление водителей отключено')">Добавить водителя</button></div>
+    <table>
+      <thead><tr><th>Имя</th><th>Телефон</th><th>Автомобиль</th><th>С нами с</th><th>Статус</th><th>Документы</th><th>Смен</th><th>Рейтинг</th><th>Долг</th></tr></thead>
+      <tbody>${drivers.map(d=>`<tr onclick="drvCard(${d.id})">
+        <td><b>${d.n}</b></td><td class="num">${d.ph}</td>
+        <td>${d.car?car(d.car).p:'<span style="color:var(--ink-3)">—</span>'}</td>
+        <td class="num">${fmt(d.since)}</td><td>${statusCell(d.st)}</td><td>${dd[d.docs]}</td>
+        <td class="num">${d.sh}</td><td class="num">${d.rate}</td>
+        <td class="num">${d.debt?`<span class="tag bad">${nf(d.debt)} ₽</span>`:'—'}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function drvCard(id){
+  const d = drv(id);
+  openModal(d.n, `
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi"><b class="num">${d.sh}</b><span>смен всего</span></div>
+      <div class="kpi"><b class="num">${d.rate}</b><span>рейтинг</span></div>
+      <div class="kpi"><b class="num">${nf(d.debt)} ₽</b><span>задолженность</span></div>
+      <div class="kpi"><b>${d.car?car(d.car).p:'—'}</b><span>закреплённый автомобиль</span></div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Данные</h3></div>
+      <table><tbody>
+        <tr><td>Телефон</td><td class="num">${d.ph}</td></tr>
+        <tr><td>Работает с</td><td class="num">${fmt(d.since)}</td></tr>
+        <tr><td>Статус</td><td>${statusCell(d.st)}</td></tr>
+        <tr><td>Водительское удостоверение</td><td>${d.docs==='ok'?'<span class="tag ok">действует</span>':d.docs==='soon'?'<span class="tag warn">истекает</span>':'<span class="tag bad">не загружено</span>'}</td></tr>
+      </tbody></table>
+    </div>
+    ${d.docs==='miss'?`<div class="note" style="margin-top:14px">Правило «Документы обязательны» блокирует выдачу машины этому водителю, пока файл не загружен.</div>`:''}`);
+}
+
+function viewMileage(){
+  return `
+  <div class="cols">
+    <div class="panel">
+      <div class="panel-head"><h3>Внести пробег</h3></div>
+      <div class="panel-body">
+        <div class="field"><label for="mCar">Автомобиль</label>
+          <select id="mCar">${cars.map(c=>`<option value="${c.id}">${c.m} · ${c.p}</option>`).join('')}</select></div>
+        <div class="field"><label for="mKm">Текущий пробег, км</label><input id="mKm" type="number" placeholder="например, 128 900"></div>
+        <div class="field"><label for="mDrv">Водитель</label>
+          <select id="mDrv">${drivers.map(d=>`<option value="${d.id}">${d.n}</option>`).join('')}</select></div>
+        <button class="btn btn-main" onclick="addMileage()">Сохранить пробег</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Фото одометра</h3></div>
+      <div class="panel-body">
+        <p style="color:var(--ink-2);font-size:14.5px">Водитель фотографирует приборную панель, система считывает цифры и подставляет их в форму.</p>
+        <div class="field" style="margin-top:14px"><label for="mPhoto">Снимок одометра</label><input id="mPhoto" type="file" accept="image/*" onchange="recognize()"></div>
+        <div id="ocr"></div>
+        <div class="note" style="margin-top:12px">В прототипе распознавание имитируется: значение подставляется по последнему пробегу машины. Реальный OCR подключается в рабочей версии.</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>История пробега</h3></div>
+    <table><thead><tr><th>Дата и время</th><th>Автомобиль</th><th>Пробег</th><th>Водитель</th><th>Источник</th></tr></thead>
+      <tbody id="mLog">${mileageRows()}</tbody></table>
+  </div>`;
+}
+const mileageRows = () => mileageLog.map(m=>`<tr><td class="num">${fmtDT(m.d)}</td><td>${car(m.car).m} · ${car(m.car).p}</td>
+  <td class="num">${nf(m.km)} км</td><td>${drv(m.drv)?.n||'—'}</td><td>${m.src}</td></tr>`).join('');
+
+function addMileage(src){
+  const id = +$('#mCar').value, km = +$('#mKm').value, d = +$('#mDrv').value;
+  const c = car(id);
+  if(!km){ toast('Укажите пробег'); return }
+  if(km < c.km){ toast(`Пробег меньше прошлого (${nf(c.km)} км)`); return }
+  const before = c.km; c.km = km; c.next = Math.max(0, c.next - (km-before));
+  mileageLog.unshift({car:id,km,d:'сегодня, ' + new Date().toTimeString().slice(0,5),drv:d,src:src||'Ручной ввод'});
+  $('#mLog').innerHTML = mileageRows(); $('#mKm').value='';
+  const run = automations.find(a=>a.on && a.when==='Пробег автомобиля изменился');
+  if(run && c.next<=0){ toast('Правило сработало: создана задача «Записать автомобиль на ТО»'); }
+  else toast('Пробег сохранён');
+}
+function recognize(){
+  const box = $('#ocr'); const c = car(+$('#mCar').value);
+  box.innerHTML = '<p style="color:var(--ink-3);font-size:14px">Считываем цифры…</p>';
+  setTimeout(()=>{
+    const val = c.km + Math.floor(Math.random()*400+120);
+    box.innerHTML = `<div class="panel" style="margin-top:8px"><div class="panel-body">
+      <p style="font-size:13px;color:var(--ink-3)">Распознано на снимке</p>
+      <p class="num" style="font-size:28px;font-weight:800;letter-spacing:-.02em">${nf(val)} км</p>
+      <button class="btn btn-sm btn-main" style="margin-top:8px" onclick="document.getElementById('mKm').value=${val};addMileage('Фото одометра')">Подтвердить и сохранить</button>
+    </div></div>`;
+  },700);
+}
+
+function viewDocs(){
+  const rows = [
+    ...cars.map(c=>({who:`${c.m} · ${c.p}`,what:'Страховка ОСАГО',d:c.ins})),
+    ...drivers.filter(d=>d.docs!=='ok').map(d=>({who:d.n,what:'Водительское удостоверение',d:d.docs==='miss'?null:'2026-10-20'}))
+  ].sort((a,b)=> (a.d?days(a.d):-999) - (b.d?days(b.d):-999));
+  return `<div class="panel">
+    <div class="panel-head"><h3>Документы</h3><span style="font-size:13px;color:var(--ink-3)">сначала то, что горит</span></div>
+    <table><thead><tr><th>Кому принадлежит</th><th>Документ</th><th>Действует до</th><th>Состояние</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${r.who}</td><td>${r.what}</td><td class="num">${fmt(r.d)}</td>
+      <td>${!r.d?'<span class="tag bad">не загружен</span>':days(r.d)<0?'<span class="tag bad">просрочен</span>':days(r.d)<45?`<span class="tag warn">через ${days(r.d)} дн.</span>`:'<span class="tag ok">действует</span>'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function viewService(){
+  return `<div class="panel">
+    <div class="panel-head"><h3>ТО и обслуживание</h3>
+      <button class="btn btn-sm btn-main" onclick="toast('В прототипе создание работ отключено')">Добавить работу</button></div>
+    <table><thead><tr><th>Автомобиль</th><th>Работа</th><th>Дата</th><th>Сумма</th><th>Статус</th></tr></thead>
+    <tbody>${service.map(s=>`<tr onclick="carCard(${s.car})"><td>${car(s.car).m} · ${car(s.car).p}</td><td>${s.what}</td>
+      <td class="num">${fmt(s.d)}</td><td class="num">${nf(s.sum)} ₽</td>
+      <td>${s.st==='Просрочено'?'<span class="tag bad">Просрочено</span>':s.st==='В работе'?'<span class="tag warn">В работе</span>':'<span class="tag">Запланировано</span>'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function viewFinance(){
+  const inc = money.filter(m=>m.k==='+').reduce((s,m)=>s+m.v,0);
+  const exp = money.filter(m=>m.k==='−').reduce((s,m)=>s+m.v,0);
+  const max = Math.max(...money.map(m=>m.v));
+  const debtors = drivers.filter(d=>d.debt>0);
+  return `
+  <div class="kpis">
+    <div class="kpi"><b class="num">${nf(inc)} ₽</b><span>поступления за месяц</span></div>
+    <div class="kpi"><b class="num">${nf(exp)} ₽</b><span>расходы за месяц</span></div>
+    <div class="kpi"><b class="num">${nf(inc-exp)} ₽</b><span>остаток</span></div>
+    <div class="kpi warn"><b class="num">${nf(debtors.reduce((s,d)=>s+d.debt,0))} ₽</b><span>долги водителей</span></div>
+  </div>
+  <div class="cols">
+    <div class="panel"><div class="panel-head"><h3>Структура за месяц</h3></div>
+      <div class="panel-body bars">
+        ${money.map(m=>`<div class="bar-row"><span>${m.n}</span>
+          <span class="bar"><i style="width:${Math.round(m.v/max*100)}%;background:${m.k==='+'?'var(--on)':'var(--ink)'}"></i></span>
+          <span class="num" style="text-align:right">${nf(m.v)} ₽</span></div>`).join('')}
+      </div></div>
+    <div class="panel"><div class="panel-head"><h3>Должники</h3></div>
+      <table><tbody>${debtors.map(d=>`<tr onclick="drvCard(${d.id})"><td>${d.n}</td>
+        <td class="num" style="text-align:right"><span class="tag bad">${nf(d.debt)} ₽</span></td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+}
+
+/* ============ АВТОМАТИЗАЦИИ — главный экран ============ */
+const WHENS = ['Пробег автомобиля изменился','Наступил срок страховки','Истекает документ водителя','Водитель начал смену','Расходы за месяц обновились','Водитель не вышел на смену'];
+const IFS   = ['Пробег после последнего ТО ≥ 10 000 км','До окончания страховки < 14 дней','Документ просрочен или отсутствует','Задолженность по аренде > 0','Расходы превысили 50 000 ₽','Смена пропущена без предупреждения'];
+const THENS = ['Создать задачу на ТО','Отправить уведомление менеджеру','Отправить сообщение водителю','Заблокировать выдачу автомобиля','Пометить автомобиль как «Недоступен»','Добавить запись в журнал событий'];
+let automations = [
+  {id:1,name:'ТО по пробегу',on:true,when:WHENS[0],ifs:[IFS[0]],thens:[THENS[0],THENS[1]]},
+  {id:2,name:'Документы обязательны',on:true,when:WHENS[2],ifs:[IFS[2]],thens:[THENS[3],THENS[2]]}
+];
+let editing = 1;
+
+function viewAutomations(){
+  const a = automations.find(x=>x.id===editing) || automations[0];
+  return `
+  <div class="panel">
+    <div class="panel-head"><h3>Мои правила</h3>
+      <button class="btn btn-sm btn-main" onclick="newAutomation()">+ Создать автоматизацию</button></div>
+    <table><thead><tr><th>Название</th><th>Когда</th><th>Действий</th><th>Состояние</th></tr></thead>
+      <tbody>${automations.map(x=>`<tr onclick="editing=${x.id};nav('automations')">
+        <td><b>${x.name}</b></td><td>${x.when}</td><td class="num">${x.thens.length}</td>
+        <td>${x.on?'<span class="tag ok">включено</span>':'<span class="tag">выключено</span>'}</td></tr>`).join('')}</tbody></table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>${a.name}</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-ghost" onclick="addNode('ifs')">+ Условие</button>
+        <button class="btn btn-sm btn-ghost" onclick="addNode('thens')">+ Действие</button>
+        <button class="btn btn-sm btn-main" onclick="toast('Правило сохранено и включено')">Сохранить</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <p style="color:var(--ink-2);font-size:14.5px;margin-bottom:14px">Выберите значения из списков. Блоки действий можно перетаскивать, чтобы менять порядок.</p>
+      <div class="flow" id="flow">
+        <div class="node node-when"><div class="node-kind">КОГДА</div>
+          <select onchange="automations.find(x=>x.id===${a.id}).when=this.value">
+            ${WHENS.map(w=>`<option ${w===a.when?'selected':''}>${w}</option>`).join('')}</select></div>
+        ${a.ifs.map((v,i)=>`<div class="link"></div>
+          <div class="node node-if"><div class="node-kind">ЕСЛИ</div>
+            <button class="node-del" onclick="delNode('ifs',${i})" title="Убрать">×</button>
+            <select onchange="automations.find(x=>x.id===${a.id}).ifs[${i}]=this.value">
+              ${IFS.map(f=>`<option ${f===v?'selected':''}>${f}</option>`).join('')}</select></div>`).join('')}
+        ${a.thens.map((v,i)=>`<div class="link"></div>
+          <div class="node node-then" draggable="true" data-i="${i}"><div class="node-kind">${i===0?'ТОГДА':'И ТАКЖЕ'}</div>
+            <button class="node-del" onclick="delNode('thens',${i})" title="Убрать">×</button>
+            <select onchange="automations.find(x=>x.id===${a.id}).thens[${i}]=this.value">
+              ${THENS.map(t=>`<option ${t===v?'selected':''}>${t}</option>`).join('')}</select></div>`).join('')}
+      </div>
+      <div class="note" style="margin-top:14px">Проверить правило можно на живых данных: внесите пробег в разделе «Пробег» — если до ТО осталось 0 км, правило сработает.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Готовые шаблоны</h3></div>
+    <div class="panel-body">
+      <div class="tpl">
+        ${[['ТО по пробегу',WHENS[0],IFS[0],THENS[0]],
+           ['Окончание страховки',WHENS[1],IFS[1],THENS[1]],
+           ['Документы водителя',WHENS[2],IFS[2],THENS[3]],
+           ['Превышение расходов',WHENS[4],IFS[4],THENS[1]],
+           ['Напоминание об аренде',WHENS[3],IFS[3],THENS[2]],
+           ['Водитель не вышел',WHENS[5],IFS[5],THENS[1]]]
+          .map(t=>`<button onclick='useTemplate(${JSON.stringify(t)})'><b>${t[0]}</b><span>${t[1]}</span></button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+function newAutomation(){
+  const id = Date.now();
+  automations.push({id,name:'Новое правило',on:false,when:WHENS[0],ifs:[IFS[0]],thens:[THENS[0]]});
+  editing = id; nav('automations'); toast('Правило создано — настройте блоки');
+}
+function useTemplate(t){
+  const id = Date.now();
+  automations.push({id,name:t[0],on:true,when:t[1],ifs:[t[2]],thens:[t[3]]});
+  editing = id; nav('automations'); toast(`Шаблон «${t[0]}» добавлен`);
+}
+function addNode(kind){
+  const a = automations.find(x=>x.id===editing);
+  a[kind].push(kind==='ifs'?IFS[1]:THENS[2]); nav('automations');
+}
+function delNode(kind,i){
+  const a = automations.find(x=>x.id===editing);
+  if(a[kind].length<=1 && kind==='ifs'){ toast('Нужно хотя бы одно условие'); return }
+  if(a[kind].length<=1){ toast('Нужно хотя бы одно действие'); return }
+  a[kind].splice(i,1); nav('automations');
+}
+function wireFlow(){
+  let from = null;
+  document.querySelectorAll('#flow .node-then').forEach(n=>{
+    n.addEventListener('dragstart',e=>{from=+n.dataset.i;n.classList.add('drag');e.dataTransfer.effectAllowed='move'});
+    n.addEventListener('dragend',()=>{n.classList.remove('drag');document.querySelectorAll('.node').forEach(x=>x.classList.remove('over'))});
+    n.addEventListener('dragover',e=>{e.preventDefault();n.classList.add('over')});
+    n.addEventListener('dragleave',()=>n.classList.remove('over'));
+    n.addEventListener('drop',e=>{
+      e.preventDefault(); const to = +n.dataset.i;
+      const a = automations.find(x=>x.id===editing);
+      if(from===null||from===to) return;
+      const [m] = a.thens.splice(from,1); a.thens.splice(to,0,m);
+      nav('automations'); toast('Порядок действий изменён');
+    });
+  });
+}
+
+/* ============ КОНСТРУКТОР ЭКРАНОВ ============ */
+const BLOCKS = ['Таблица','Форма','Карточка','Календарь','Статистика','График','Фильтр','Уведомление','Автоматизация'];
+const SOURCES = ['Автомобили','Водители','ТО','Документы','Финансы','Пробег'];
+let draft = [];
+let myScreens = [];
+
+function viewBuilder(){
+  return `
+  <div class="build">
+    <div class="palette">
+      <p style="font-size:13px;color:var(--ink-3);margin-bottom:2px">Перетащите блок вправо</p>
+      ${BLOCKS.map(b=>`<div class="pal" draggable="true" data-b="${b}">${b}</div>`).join('')}
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="panel-head">
+          <div class="field" style="margin:0;min-width:240px"><label for="scName">Название экрана</label>
+            <input id="scName" value="Отчёт по расходам" /></div>
+          <button class="btn btn-sm btn-main" onclick="saveScreen()">Сохранить экран</button>
+        </div>
+      </div>
+      <div class="canvas" id="canvas">${draftHtml()}</div>
+    </div>
+  </div>
+  <div class="note">Экран, который вы соберёте, появится в левом меню разделом «Мои экраны» — так же, как встроенные разделы.</div>`;
+}
+const draftHtml = () => draft.length ? draft.map((b,i)=>`
+  <div class="blk"><b>${b.type}</b>
+    <button class="node-del" onclick="draft.splice(${i},1);document.getElementById('canvas').innerHTML=draftHtml()">×</button>
+    <div class="cfg"><span style="font-size:13px;color:var(--ink-3)">источник</span>
+      <select onchange="draft[${i}].src=this.value">${SOURCES.map(s=>`<option ${s===b.src?'selected':''}>${s}</option>`).join('')}</select>
+    </div></div>`).join('') : '<div class="empty">Пусто. Перетащите сюда блок из списка слева.</div>';
+
+function wireBuilder(){
+  const canvas = $('#canvas');
+  document.querySelectorAll('.pal').forEach(p=>{
+    p.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',p.dataset.b));
+  });
+  canvas.addEventListener('dragover',e=>{e.preventDefault();canvas.classList.add('hot')});
+  canvas.addEventListener('dragleave',()=>canvas.classList.remove('hot'));
+  canvas.addEventListener('drop',e=>{
+    e.preventDefault(); canvas.classList.remove('hot');
+    const type = e.dataTransfer.getData('text/plain'); if(!type) return;
+    draft.push({type,src:SOURCES[0]}); canvas.innerHTML = draftHtml(); toast(`Блок «${type}» добавлен`);
+  });
+}
+function saveScreen(){
+  if(!draft.length){ toast('Добавьте хотя бы один блок'); return }
+  const name = $('#scName').value.trim() || 'Мой экран';
+  const key = 'my'+Date.now();
+  myScreens.push({key,name,blocks:draft.slice()});
+  draft = [];
+  const wrap = $('#myScreens'); $('#myScreensSep').style.display='';
+  const a = document.createElement('a'); a.dataset.go = key; a.innerHTML = `<span class="ic">◈</span>${name}`;
+  a.addEventListener('click',()=>nav(key)); wrap.appendChild(a);
+  nav(key); toast('Экран сохранён и добавлен в меню');
+}
+function viewCustom(key){
+  const sc = myScreens.find(s=>s.key===key);
+  if(!sc) return '<div class="panel"><div class="panel-body">Экран не найден.</div></div>';
+  return sc.blocks.map(b=>renderBlock(b)).join('') +
+    `<div class="note">Этот экран собран в конструкторе из блоков: ${sc.blocks.map(b=>b.type).join(', ')}. Программирование не потребовалось.</div>`;
+}
+function renderBlock(b){
+  const head = `<div class="panel-head"><h3>${b.type} · ${b.src}</h3></div>`;
+  if(b.type==='Таблица'){
+    if(b.src==='Водители') return `<div class="panel">${head}<table><thead><tr><th>Имя</th><th>Автомобиль</th><th>Смен</th><th>Долг</th></tr></thead>
+      <tbody>${drivers.slice(0,8).map(d=>`<tr><td>${d.n}</td><td>${d.car?car(d.car).p:'—'}</td><td class="num">${d.sh}</td><td class="num">${nf(d.debt)} ₽</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="panel">${head}<table><thead><tr><th>Автомобиль</th><th>Номер</th><th>Пробег</th><th>Статус</th></tr></thead>
+      <tbody>${cars.slice(0,8).map(c=>`<tr><td>${c.m}</td><td class="num">${c.p}</td><td class="num">${nf(c.km)} км</td><td>${statusCell(c.st)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if(b.type==='Статистика') return `<div class="kpis">
+    <div class="kpi"><b class="num">${cars.length}</b><span>автомобилей</span></div>
+    <div class="kpi"><b class="num">${cars.filter(c=>c.st==='line').length}</b><span>на линии</span></div>
+    <div class="kpi"><b class="num">${nf(money.filter(m=>m.k==='−').reduce((s,m)=>s+m.v,0))} ₽</b><span>расходы</span></div></div>`;
+  if(b.type==='График'){
+    const max = Math.max(...money.map(m=>m.v));
+    return `<div class="panel">${head}<div class="panel-body bars">${money.map(m=>`<div class="bar-row"><span>${m.n}</span>
+      <span class="bar"><i style="width:${Math.round(m.v/max*100)}%"></i></span><span class="num" style="text-align:right">${nf(m.v)} ₽</span></div>`).join('')}</div></div>`;
+  }
+  if(b.type==='Фильтр') return `<div class="panel">${head}<div class="panel-body" style="display:flex;gap:10px;flex-wrap:wrap">
+    <select style="width:auto"><option>Статус: любой</option>${Object.values(STATUS).map(s=>`<option>Статус: ${s.t}</option>`).join('')}</select>
+    <select style="width:auto"><option>Период: этот месяц</option><option>Период: неделя</option></select></div></div>`;
+  if(b.type==='Форма') return `<div class="panel">${head}<div class="panel-body">
+    <div class="field"><label>Автомобиль</label><select>${cars.map(c=>`<option>${c.p}</option>`).join('')}</select></div>
+    <div class="field"><label>Комментарий</label><input placeholder="Например, замена колодок"></div>
+    <button class="btn btn-sm btn-main" onclick="toast('Запись добавлена')">Добавить запись</button></div></div>`;
+  if(b.type==='Карточка') return `<div class="panel">${head}<div class="panel-body">
+    <p style="font-size:13px;color:var(--ink-3)">${b.src}</p><p style="font-size:22px;font-weight:800" class="num">${cars[0].m} · ${cars[0].p}</p>
+    <p style="color:var(--ink-2)">Пробег ${nf(cars[0].km)} км · ${STATUS[cars[0].st].t}</p></div></div>`;
+  if(b.type==='Календарь') return `<div class="panel">${head}<table><tbody>
+    ${service.map(s=>`<tr><td class="num">${fmt(s.d)}</td><td>${car(s.car).p}</td><td>${s.what}</td></tr>`).join('')}</tbody></table></div>`;
+  if(b.type==='Уведомление') return `<div class="panel">${head}<div class="panel-body">
+    <p style="color:var(--ink-2)">Кому: менеджер парка. Текст: «Автомобиль требует внимания».</p></div></div>`;
+  return `<div class="panel">${head}<div class="panel-body" style="color:var(--ink-2)">Блок «${b.type}» подключён к источнику «${b.src}».</div></div>`;
+}
+
+/* ============ АНАЛИТИКА И НАСТРОЙКИ ============ */
+function viewAnalytics(){
+  const byStatus = Object.keys(STATUS).map(k=>({k,n:cars.filter(c=>c.st===k).length}));
+  const maxS = Math.max(...byStatus.map(s=>s.n));
+  const top = [...drivers].sort((a,b)=>b.sh-a.sh).slice(0,6);
+  const maxSh = top[0].sh;
+  return `<div class="cols">
+    <div class="panel"><div class="panel-head"><h3>Машины по статусам</h3></div>
+      <div class="panel-body bars">${byStatus.map(s=>`<div class="bar-row"><span>${STATUS[s.k].t}</span>
+        <span class="bar"><i style="width:${Math.round(s.n/maxS*100)}%"></i></span><span class="num" style="text-align:right">${s.n}</span></div>`).join('')}</div></div>
+    <div class="panel"><div class="panel-head"><h3>Водители по сменам</h3></div>
+      <div class="panel-body bars">${top.map(d=>`<div class="bar-row"><span>${d.n.split(' ')[0]} ${d.n.split(' ')[1][0]}.</span>
+        <span class="bar"><i style="width:${Math.round(d.sh/maxSh*100)}%"></i></span><span class="num" style="text-align:right">${d.sh}</span></div>`).join('')}</div></div>
+  </div>
+  <div class="panel"><div class="panel-head"><h3>Расходы на автомобиль за месяц</h3></div>
+    <table><thead><tr><th>Автомобиль</th><th>Пробег</th><th>Расходы</th><th>На 1000 км</th></tr></thead>
+    <tbody>${cars.map(c=>`<tr onclick="carCard(${c.id})"><td>${c.m} · ${c.p}</td><td class="num">${nf(c.km)} км</td>
+      <td class="num">${nf(c.cost)} ₽</td><td class="num">${nf(Math.round(c.cost/ (c.km/1000) * 10))} ₽</td></tr>`).join('')}</tbody></table></div>`;
+}
+function viewSettings(){
+  return `<div class="cols">
+    <div class="panel"><div class="panel-head"><h3>Таксопарк</h3></div><div class="panel-body">
+      <div class="field"><label for="sName">Название</label><input id="sName" value="Таксопарк «Демо»"></div>
+      <div class="field"><label for="sCity">Город</label><input id="sCity" value="Москва"></div>
+      <button class="btn btn-sm btn-main" onclick="document.getElementById('who').textContent=document.getElementById('sName').value+' · BUSINESS';toast('Настройки сохранены')">Сохранить</button>
+    </div></div>
+    <div class="panel"><div class="panel-head"><h3>Тариф</h3></div><div class="panel-body">
+      <p><b>BUSINESS</b> — 499 ₽ в месяц</p>
+      <p style="color:var(--ink-2);margin-top:6px">до 50 автомобилей, автоматизации без ограничений, аналитика, уведомления.</p>
+      <button class="btn btn-sm btn-ghost" style="margin-top:12px" onclick="backToSite()">Посмотреть тарифы</button>
+    </div></div>
+  </div>
+  <div class="note">Учебный прототип: оплата, интеграции и рассылка уведомлений не подключены.</div>`;
+}
+
+const VIEWS = {dash:viewDash,cars:viewCars,drivers:viewDrivers,mileage:viewMileage,docs:viewDocs,
+  service:viewService,finance:viewFinance,automations:viewAutomations,builder:viewBuilder,
+  analytics:viewAnalytics,settings:viewSettings};
+</script>
+</body>
+</html>
